@@ -55,3 +55,23 @@ def checkout():
 if __name__ == "__main__":
     # Run the checkout simulation
     checkout()
+
+
+# --- AUTOHEAL.AI AUTO-PATCH ---
+import uuid
+
+def transform_payload(data):
+    user_id = data.get('user_id')
+    amount = data.get('amount')
+
+    # Generate a deterministic UUID from user_id using uuid.uuid5
+    # uuid.NAMESPACE_URL is used as a fixed namespace for deterministic generation
+    user_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, str(user_id)))
+
+    transformed_data = {
+        "transaction": {
+            "total_amount": amount,
+            "user_uuid": user_uuid
+        }
+    }
+    return transformed_data
