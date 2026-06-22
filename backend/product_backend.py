@@ -1,10 +1,18 @@
 import sys
 import httpx
 import aegis_agent
+import uuid
 
 # Avoid unicode encode errors on Windows
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
+
+def transform_payload(data):
+    user_id = data.get('user_id')
+    amount = data.get('amount')
+    user_uuid = str(uuid.uuid5(uuid.NAMESPACE_OID, str(user_id)))
+    new_payload = {"transaction": {"total_amount": amount, "user_uuid": user_uuid}}
+    return new_payload
 
 def checkout():
     """
@@ -19,11 +27,15 @@ def checkout():
         "amount": 99.00
     }
     
+    # Intercept and transform the payload to the new format
+    print("[Product Backend] Transforming payload to new vendor format...")
+    new_cart_payload = transform_payload(old_cart_payload)
+    
     target_url = "http://127.0.0.1:8000/pay"
 
     try:
-        # We attempt the HTTP request to the vendor
-        response = httpx.post(target_url, json=old_cart_payload)
+        # We attempt the HTTP request to the vendor with the transformed payload
+        response = httpx.post(target_url, json=new_cart_payload)
         
         # This raises an exception if the status code is 4xx or 5xx
         response.raise_for_status() 
@@ -38,10 +50,10 @@ def checkout():
             print("\n[Product Backend] CAUGHT 400 ERROR from Vendor!")
             print(f"Error Message: {error_details}")
             
-            # Delegate to Aegis Agent
+            # Delegate to Aegis Agent, passing the *transformed* payload
             print("\n[Product Backend] Delegating payload and error to Aegis Remediation Agent...")
             try:
-                healed_response = aegis_agent.heal_and_retry(old_cart_payload, error_details, target_url)
+                healed_response = aegis_agent.heal_and_retry(new_cart_payload, error_details, target_url)
                 print(f"[Product Backend] Order placed successfully after self-healing: {healed_response}")
                 return healed_response
             except Exception as healing_err:
